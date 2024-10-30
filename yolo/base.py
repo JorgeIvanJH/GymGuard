@@ -12,7 +12,7 @@ w, h, fps = (int(cap.get(x)) for x in (cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FR
 gym = solutions.AIGym(
     model="yolo11n-pose.pt",
     show=True,
-    kpts=[6, 8, 10],
+    kpts=[6, 8, 10, 5, 7, 9],
 )
 
 # Manually set lw if not set in the AIGym class
