@@ -1,4 +1,4 @@
-name: gym_guard
+name: yolo
 channels:
   - conda-forge
   - defaults
