@@ -1,5 +1,5 @@
 
-filename_ext = "my_squats.mp4"
+filename_ext = "my_squats_vid.mp4"
 
 filename, file_extension = filename_ext.split('.')
 reading_path = "videos/input/"
@@ -44,6 +44,7 @@ keypoint_map = {
     16: "right_ankle"
 }
 
+model.track(source = reading_path + filename_ext, show = True, save = True, conf = 0.3)
 
 cap = cv2.VideoCapture(reading_path + filename_ext)
 w, h, fps = (int(cap.get(x)) for x in (cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT, cv2.CAP_PROP_FPS))
