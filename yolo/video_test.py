@@ -1,101 +1,93 @@
-import os
-import cv2
-from ultralytics import solutions
-# from ultralytics.ultralytics import solutions
-filename = "my_squats.mp4"
+
+filename_ext = "my_squats.mp4"
+
+filename, file_extension = filename_ext.split('.')
 reading_path = "videos/input/"
 saving_path = "videos/output/"
 
-# Set the environment variable to avoid OpenMP runtime error
+import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-print("reading_path + filename: ", reading_path + filename)
+from ultralytics import YOLO
+from ultralytics import solutions
+import pandas as pd
+import time
+import cv2
 
-cap = cv2.VideoCapture(reading_path + filename)
-assert cap.isOpened(), "Error reading video file"
-w, h, fps = (int(cap.get(x)) for x in (cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT, cv2.CAP_PROP_FPS))
-
-video_writer = cv2.VideoWriter( saving_path + filename[:-4] + ".avi" , cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
-
-
-model = solutions.AIGym(
+model = YOLO("yolo11n-pose.pt")
+model_tracker = solutions.AIGym(
     model="yolo11n-pose.pt",
     show=True,
     lw=1,  # Line width
     kpts=[16,14,12]
 )
-print("model: ", type(model), model, dir(model))
-
-if not hasattr(model, 'lw') or model.lw is None:
-    model.lw = 1  # Set a default value for lw
-    
-while cap.isOpened():
-    success, im0 = cap.read()
-    if not success:
-        print("Video frame is empty or video processing has been successfully completed.")
-        break
-    print("model.kpts: ", type(model.kpts), model.kpts, dir(model.kpts))
-    im0 = model.monitor(im0)
-    video_writer.write(im0)
-
-    print("im0: ", type(im0), im0, dir(im0))
-    1/0
-
-cv2.destroyAllWindows()
-video_writer.release()
+if not hasattr(model_tracker, 'lw') or model_tracker.lw is None:
+    model_tracker.lw = 1  # Set a default value for lw
 
 
+keypoint_map = {
+    0: "nose",
+    1: "left_eye",
+    2: "right_eye",
+    3: "left_ear",
+    4: "right_ear",
+    5: "left_shoulder",
+    6: "right_shoulder",
+    7: "left_elbow",
+    8: "right_elbow",
+    9: "left_wrist",
+    10: "right_wrist",
+    11: "left_hip",
+    12: "right_hip",
+    13: "left_knee",
+    14: "right_knee",
+    15: "left_ankle",
+    16: "right_ankle"
+}
 
 
+cap = cv2.VideoCapture(reading_path + filename_ext)
+w, h, fps = (int(cap.get(x)) for x in (cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT, cv2.CAP_PROP_FPS))
+video_writer = cv2.VideoWriter( saving_path + filename + ".avi" , cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
 
 
-#################### APPROACH 2 ####################
-
-import cv2
-from ultralytics import YOLO
-import csv
-import time
-
-filename = "my_squats.mp4"
-reading_path = "videos/input/"
-saving_path = "videos/output/"
-
-# Load a model
-model = YOLO("yolov8n-pose.pt")  # Replace with a higher model variant if needed
-
-cap = cv2.VideoCapture(reading_path + filename)
-
+cols = ["timestamp", "frame", "person"]
+cols = cols + list(keypoint_map.values())
+df = pd.DataFrame(columns=cols)
 joint_positions_over_time = []  # List to store joint data for each frame
 
 while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
+
+    success, img_frame = cap.read()
+    if not success:
+        print("Video frame is empty or video processing has been successfully completed.")
         break
 
-    # Run YOLO pose detection on the frame
-    results = model(frame)
-    print("results: ", results,dir(results))
-    # Capture the timestamp for each frame (optional)
     timestamp = time.time()
+    # Run YOLO pose detection on the frame
+    results = model(img_frame, show = True, save = False, conf = 0.3)
+    # print("results: ", results, dir(results))
+    for frame_idx, frame_result in enumerate(results):
+        cv2.imwrite(saving_path + filename_ext, frame_result.orig_img)
+        # print(f"Frame {frame_idx}: {frame_result}")
+        # print("frame_result: ", type(frame_result), frame_result, dir(frame_result))
+        df.loc[timestamp,"frame"] = frame_idx
+        df.loc[timestamp,"timestamp"] = timestamp
+        for person_idx, person in enumerate(frame_result.keypoints):
+            # print(f"\tPerson {person_idx}: {person}")
+            # print("\tperson: ", type(person), person, dir(person))
+            df.loc[timestamp,"person"] = person_idx
+            for joint_idx, joint in enumerate(person):
+                # print(f"\t\tJoint {joint_idx}: {joint}")
+                # print("\t\tjoint: ", type(joint), joint, dir(joint))
+                joints_xy = joint.xy
+                df.loc[timestamp,list(keypoint_map.values())] = joints_xy[0,:,:].tolist()
 
-    # Loop over detected poses (each person detected in the frame)
-    for r in results:
-        frame_joints = {'timestamp': timestamp}  # Initialize dictionary for this frame
-        keypoints = r.keypoints.xy.cpu().numpy()  # Extract keypoints for this detection
-        print("r: ", type(r), r, dir(r))
-        print("r.keypoints: ", type(r.keypoints), r.keypoints, dir(r.keypoints))
-        print("r.keypoints.xy: ", type(r.keypoints.xy),r.keypoints.xy, dir(r.keypoints.xy))
-        confidences = r.keypoints.conf.cpu().numpy() if r.keypoints.has_visible else None
-
-        # Parse and save each keypoint position
-        for idx, (x, y) in enumerate(keypoints):
-            frame_joints[f'joint_{idx}_x'] = x
-            frame_joints[f'joint_{idx}_y'] = y
-            if confidences is not None:
-                frame_joints[f'joint_{idx}_confidence'] = confidences[idx]  # Confidence score for the keypoint
-
-        joint_positions_over_time.append(frame_joints)
-
-cap.release()
+    im_monitor = model_tracker.monitor(img_frame)
+    video_writer.write(im_monitor)
+    
+df.to_csv(saving_path + filename + ".csv", index = False)
+cv2.destroyAllWindows()
+video_writer.release()
 
 # Optionally, save the joint history to a file
 with open('joint_history.txt', 'w') as f:
