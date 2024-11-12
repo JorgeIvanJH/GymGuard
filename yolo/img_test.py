@@ -1,4 +1,4 @@
-filename_ext = "my-squats.jpg"
+filename_ext = "my_squats_img.jpg"
 
 filename, file_extension = filename_ext.split('.')
 reading_path = "videos/input/"
@@ -33,7 +33,7 @@ cols = ["frame", "person"]
 cols = cols + list(keypoint_map.values())
 df = pd.DataFrame(columns=cols)
 
-results = model(source = reading_path + filename_ext, show = True, save = False, conf = 0.3)
+results = model(source = reading_path + filename_ext, show = True, save = True, conf = 0.3)
 # print("results: ", results, dir(results))
 for frame_idx, frame_result in enumerate(results):
     cv2.imwrite(saving_path + filename_ext, frame_result.orig_img)
