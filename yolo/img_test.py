@@ -1,4 +1,4 @@
-filename_ext = "my_squats_img.jpg"
+filename_ext = input("Enter the filename with extension: ")
 
 filename, file_extension = filename_ext.split('.')
 reading_path = "videos/input/"
